@@ -10,8 +10,8 @@
 
 > | guidance_w = 1.0  | guidance_w = 0.0 |
 > | ------------- | ------------- |
-> | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-0_gw-1.png">  | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-0_gw-0.png">  |
-> | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-1_gw-1.png">  | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-1_gw-0.png">   |
+> | <img alt="banner" src="./assets/c-0_gw-1.png">  | <img alt="banner" src="./assets/c-0_gw-0.png">  |
+> | <img alt="banner" src="./assets/c-1_gw-1.png">  | <img alt="banner" src="./assets/c-1_gw-0.png">   |
 
 ## Features
 
