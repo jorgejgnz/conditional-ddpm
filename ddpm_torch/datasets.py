@@ -10,7 +10,7 @@ from collections import namedtuple
 
 CSV = namedtuple("CSV", ["header", "index", "data"])
 CONDITIONAL = False
-
+C_IN_DIM = 512
 
 def crop_celeba(img):
     return transforms.functional.crop(img, top=40, left=15, height=148, width=148)
@@ -27,7 +27,8 @@ class CelebA(datasets.VisionDataset):
             root,
             split,
             download=False,
-            transform=transforms.ToTensor()
+            transform=transforms.ToTensor(),
+            emb_tensor_filename='celeba-embeddings-tensor_inception-resnet-v1-vggface2.pt'
     ):
         super().__init__(root, transform=transform)
         self.split = split
@@ -45,6 +46,11 @@ class CelebA(datasets.VisionDataset):
         else:
             self.filename = [splits.index[i] for i in torch.squeeze(torch.nonzero(mask))]
         self.download = download
+
+        ###########################################
+        ## Load emb_tensor
+        self.embs_tensor = torch.load(emb_tensor_filename)
+        ###########################################
 
     def _load_csv(
             self,
@@ -73,7 +79,11 @@ class CelebA(datasets.VisionDataset):
         if self.transform is not None:
             X = self.transform(X)
 
-        return X, 0
+        ###########################################
+        emb = self.embs_tensor[index].to(X.device)
+        ###########################################
+
+        return X, emb
 
     def __len__(self):
         return len(self.filename)
@@ -185,7 +195,7 @@ def get_dataloader(
                 root=root, train=False, download=False, transform=transform)
         else:
             data = DATA_INFO[dataset]["data"](
-                root=root, train=True, download=False, transform=transform)
+                root=root, train=True, download=True, transform=transform)
             if val_size == 0:
                 assert split == "train"
             else:

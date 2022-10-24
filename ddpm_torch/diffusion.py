@@ -1,5 +1,7 @@
+import random
 import numpy as np
 import torch
+from tqdm.auto import tqdm
 from .functions import normal_kl, discretized_gaussian_loglik, flat_mean
 
 
@@ -35,7 +37,8 @@ class GaussianDiffusion:
             betas,
             model_mean_type,
             model_var_type,
-            loss_type
+            loss_type,
+            c_guidance_drop=0.1
     ):
         assert isinstance(betas, np.ndarray) and betas.dtype == np.float64
         assert (betas > 0).all() and (betas <= 1).all()
@@ -43,27 +46,31 @@ class GaussianDiffusion:
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
         self.loss_type = loss_type
+        self.c_guidance_drop = c_guidance_drop
 
         self.timesteps = len(betas)
 
         alphas = 1 - betas
         self.alphas_bar = np.cumprod(alphas)
-        alphas_bar_prev = np.concatenate([np.ones(1, dtype=np.float64), self.alphas_bar[:-1]])
+        self.alphas_bar_prev = np.concatenate([np.ones(1, dtype=np.float64), self.alphas_bar[:-1]])
+
+        # q(x_t | x_{t-1})
+        self.sqrt_alphas = np.sqrt(alphas)
 
         # q(x_t | x_0)
         self.sqrt_alphas_bar = np.sqrt(self.alphas_bar)
-        self.sqrt_one_minus_alphas_bar = np.sqrt(1. - self.alphas_bar)
 
         # q(x_{t-1} | x_t, x_0)
         # refer to the formula 1-3 in README.md
-        sqrt_alphas_bar_prev = np.sqrt(alphas_bar_prev)
+        self.sqrt_alphas_bar_prev = np.sqrt(self.alphas_bar_prev)
+        self.sqrt_one_minus_alphas_bar = np.sqrt(1. - self.alphas_bar)
         self.sqrt_recip_alphas_bar = np.sqrt(1. / self.alphas_bar)
         self.sqrt_recip_m1_alphas_bar = np.sqrt(1. / self.alphas_bar - 1.)  # m1: minus 1
-        self.posterior_var = betas * (1. - alphas_bar_prev) / (1. - self.alphas_bar)
+        self.posterior_var = betas * (1. - self.alphas_bar_prev) / (1. - self.alphas_bar)
         self.posterior_logvar_clipped = np.log(np.concatenate([
             np.array([self.posterior_var[1], ], dtype=np.float64), self.posterior_var[1:]]))
-        self.posterior_mean_coef1 = betas * sqrt_alphas_bar_prev / (1. - self.alphas_bar)
-        self.posterior_mean_coef2 = np.sqrt(alphas) * (1. - alphas_bar_prev) / (1. - self.alphas_bar)
+        self.posterior_mean_coef1 = betas * self.sqrt_alphas_bar_prev / (1. - self.alphas_bar)
+        self.posterior_mean_coef2 = np.sqrt(alphas) * (1. - self.alphas_bar_prev) / (1. - self.alphas_bar)
 
         # for fixed model_var_type's
         self.fixed_model_var, self.fixed_model_logvar = {
@@ -72,48 +79,59 @@ class GaussianDiffusion:
         }[self.model_var_type]
 
     @staticmethod
-    def _extract(
-            arr, t, x,
-            dtype=torch.float32, device=torch.device("cpu"), ndim=4):
-        if x is not None:
-            dtype = x.dtype
-            device = x.device
-            ndim = x.ndim
-        out = torch.tensor(arr, dtype=dtype, device=device)[t]
-        return out.reshape((-1, ) + (1, ) * (ndim - 1))
+    def _extract(arr, t, ndim):
+        B = len(t)
+        out = torch.tensor(arr, dtype=torch.float32)[t]
+        return out.reshape((B,) + (1,) * (ndim - 1))
 
     def q_mean_var(self, x_0, t):
-        mean = self._extract(self.sqrt_alphas_bar, t, x_0) * x_0
-        var = self._extract(1. - self.alphas_bar, t, x_0)
-        logvar = self._extract(self.sqrt_one_minus_alphas_bar, t, x_0)
+        ndim = x_0.ndim
+        mean = self._extract(self.sqrt_alphas_bar, t, ndim=ndim) * x_0
+        var = self._extract(1. - self.alphas_bar, t, ndim=ndim)
+        logvar = self._extract(self.sqrt_one_minus_alphas_bar, t, ndim=ndim)
         return mean, var, logvar
 
     def q_sample(self, x_0, t, noise=None):
         if noise is None:
             noise = torch.randn_like(x_0)
-        coef1 = self._extract(self.sqrt_alphas_bar, t, x_0)
-        coef2 = self._extract(self.sqrt_one_minus_alphas_bar, t, x_0)
+
+        ndim = x_0.ndim
+        coef1 = self._extract(self.sqrt_alphas_bar, t, ndim=ndim).to(x_0.device)
+        coef2 = self._extract(self.sqrt_one_minus_alphas_bar, t, ndim=ndim).to(x_0.device)
+
         return coef1 * x_0 + coef2 * noise
 
     def q_posterior_mean_var(self, x_0, x_t, t):
-        posterior_mean_coef1 = self._extract(self.posterior_mean_coef1, t, x_0)
-        posterior_mean_coef2 = self._extract(self.posterior_mean_coef2, t, x_0)
+        ndim = x_0.ndim
+        posterior_mean_coef1 = self._extract(self.posterior_mean_coef1, t, ndim=ndim).to(x_0.device)
+        posterior_mean_coef2 = self._extract(self.posterior_mean_coef2, t, ndim=ndim).to(x_0.device)
         posterior_mean = posterior_mean_coef1 * x_0 + posterior_mean_coef2 * x_t
-        posterior_var = self._extract(self.posterior_var, t, x_0)
-        posterior_logvar = self._extract(self.posterior_logvar_clipped, t, x_0)
+        posterior_var = self._extract(self.posterior_var, t, ndim=ndim)
+        posterior_logvar = self._extract(self.posterior_logvar_clipped, t, ndim=ndim).to(x_0.device)
         return posterior_mean, posterior_var, posterior_logvar
 
-    def p_mean_var(self, denoise_fn, x_t, t, clip_denoised, return_pred):
+    def p_mean_var(self, denoise_fn, x_t, t, c, guide_w, clip_denoised, return_pred):
         B, C, H, W = x_t.shape
-        out = denoise_fn(x_t, t)
+        ndim = x_t.ndim
+
+        t = t.to(x_t.device)
+        c = c.to(x_t.device)
+
+        guide_w = guide_w * 2.0 - 1.0 # [0,1] -> [-1,1]
+        out = (1 + guide_w) * denoise_fn(x_t, t, c, c.shape) - guide_w * denoise_fn(x_t, t, None, c.shape)
+
+        x_t = x_t[:B]
+        t = t[:B]
+        c = c[:B]
 
         if self.model_var_type == "learned":
             assert all(out.shape == (B, 2 * C, H, W))
             out, model_logvar = out.chunk(2, dim=1)
             model_var = torch.exp(model_logvar)
         elif self.model_var_type in ["fixed-small", "fixed-large"]:
-            model_var, model_logvar = self._extract(self.fixed_model_var, t, x_t),\
-                                      self._extract(self.fixed_model_logvar, t, x_t)
+            model_var, model_logvar = self._extract(self.fixed_model_var, t, ndim=ndim),\
+                                      self._extract(self.fixed_model_logvar, t, ndim=ndim)
+            model_var, model_logvar = model_var.to(x_t.device), model_logvar.to(x_t.device)
         else:
             raise NotImplementedError(self.model_var_type)
 
@@ -137,42 +155,44 @@ class GaussianDiffusion:
             return model_mean, model_var, model_logvar
 
     def _pred_x_0_from_mean(self, x_t, mean, t):
-        coef1 = self._extract(self.posterior_mean_coef1, t, x_t)
-        coef2 = self._extract(self.posterior_mean_coef2, t, x_t)
+        ndim = x_t.ndim
+        coef1 = self._extract(self.posterior_mean_coef1, t, ndim=ndim).to(x_t.device)
+        coef2 = self._extract(self.posterior_mean_coef2, t, ndim=ndim).to(x_t.device)
         return mean / coef1 - coef2 / coef1 * x_t
 
     def _pred_x_0_from_eps(self, x_t, eps, t):
-        coef1 = self._extract(self.sqrt_recip_alphas_bar, t, x_t)
-        coef2 = self._extract(self.sqrt_recip_m1_alphas_bar, t, x_t)
+        ndim = x_t.ndim
+        coef1 = self._extract(self.sqrt_recip_alphas_bar, t, ndim=ndim).to(x_t.device)
+        coef2 = self._extract(self.sqrt_recip_m1_alphas_bar, t, ndim=ndim).to(x_t.device)
         return coef1 * x_t - coef2 * eps
 
     # === sample ===
 
-    def p_sample_step(self, denoise_fn, x_t, t, clip_denoised=True, return_pred=False):
+    def p_sample_step(self, denoise_fn, x_t, t, c, guide_w, clip_denoised=True, return_pred=False): 
         ndim = x_t.ndim
         model_mean, _, model_logvar, pred_x_0 = self.p_mean_var(
-            denoise_fn, x_t, t, clip_denoised=clip_denoised, return_pred=True)
+            denoise_fn, x_t, t, c, guide_w, clip_denoised=clip_denoised, return_pred=True)
         noise = torch.randn_like(x_t)
         nonzero_mask = (t > 0).reshape((-1,) + (1,) * (ndim - 1)).to(x_t)
         sample = model_mean + nonzero_mask * torch.exp(0.5 * model_logvar) * noise
         return (sample, pred_x_0) if return_pred else sample
 
     @torch.inference_mode()
-    def p_sample(self, denoise_fn, shape, device=torch.device("cpu"), noise=None):
+    def p_sample(self, denoise_fn, c, guide_w, shape, device=torch.device("cpu"), noise=None):
         B, *_ = shape
         t = torch.empty((B, ), dtype=torch.int64, device=device)
         if noise is None:
             x_t = torch.randn(shape, device=device)
         else:
             x_t = noise.to(device)
-        for ti in range(self.timesteps - 1, -1, -1):
+        print('Sampling...')
+        for ti in tqdm(range(self.timesteps - 1, -1, -1), total=self.timesteps):
             t.fill_(ti)
-            x_t = self.p_sample_step(denoise_fn, x_t, t)
+            x_t = self.p_sample_step(denoise_fn, x_t, t, c, guide_w)
         return x_t
 
     @torch.inference_mode()
-    def p_sample_progressive(
-            self, denoise_fn, shape, device=torch.device("cpu"), noise=None, pred_freq=50):
+    def p_sample_progressive(self, denoise_fn, shape, device=torch.device("cpu"), noise=None, pred_freq=50):
         B, *_ = shape
         t = torch.empty(B, dtype=torch.int64, device=device)
         if noise is None:
@@ -180,14 +200,14 @@ class GaussianDiffusion:
         else:
             x_t = noise.to(device)
         L = self.timesteps // pred_freq
-        preds = torch.zeros((L, B) + shape[1:], dtype=torch.float32)
+        preds = torch.zeros((B, L) + shape[1:], dtype=torch.float32)
         idx = L
         for ti in range(self.timesteps - 1, -1, -1):
             t.fill_(ti)
             x_t, pred = self.p_sample_step(denoise_fn, x_t, t, return_pred=True)
             if (ti + 1) % pred_freq == 0:
                 idx -= 1
-                preds[idx] = pred.cpu()
+                preds[:, idx] = pred.cpu()
         return x_t.cpu(), preds
 
     # === log likelihood ===
@@ -207,10 +227,18 @@ class GaussianDiffusion:
         output = torch.where(t.to(kl.device) > 0, kl, decoder_nll)
         return (output, pred_x_0) if return_pred else output
 
-    def train_losses(self, denoise_fn, x_0, t, noise=None):
+    def train_losses(self, denoise_fn, x_0, t, c, noise=None):
         if noise is None:
             noise = torch.randn_like(x_0)
         x_t = self.q_sample(x_0, t, noise=noise)
+
+        c_shape = c.shape
+        # classifier-free guidance
+        if random.uniform(0, 1) < self.c_guidance_drop:
+            c = None
+
+        # [0.0,0.0,0.0,...] + 0.25 -> [0.25,0.25,0.25,...] -> [binary]
+        #c = torch.bernoulli(torch.zeros_like(c) + self.c_guidance_drop).to(x_t.device) # dropout context with some probability
 
         # calculate the loss
         # kl: weighted
@@ -218,6 +246,7 @@ class GaussianDiffusion:
         if self.loss_type == "kl":
             losses = self._loss_term_bpd(
                 denoise_fn, x_0=x_0, x_t=x_t, t=t, clip_denoised=False, return_pred=False)
+
         elif self.loss_type == "mse":
             assert self.model_var_type != "learned"
             if self.model_mean_type == "mean":
@@ -228,8 +257,9 @@ class GaussianDiffusion:
                 target = noise
             else:
                 raise NotImplementedError(self.model_mean_type)
-            model_out = denoise_fn(x_t, t)
-            losses = flat_mean((target - model_out).pow(2))
+
+            eps = denoise_fn(x_t, t, c, c_shape)
+            losses = flat_mean((target - eps).pow(2))
         else:
             raise NotImplementedError(self.loss_type)
 
@@ -244,7 +274,7 @@ class GaussianDiffusion:
 
     def calc_all_bpd(self, denoise_fn, x_0, clip_denoised=True):
         B, T = x_0.shape, self.timesteps
-        t = torch.empty([B, ], dtype=torch.int64)
+        t = torch.ones([B, ], dtype=torch.int64)
         t.fill_(T - 1)
         losses = torch.zeros([B, T], dtype=torch.float32)
         mses = torch.zeros([B, T], dtype=torch.float32)

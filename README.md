@@ -6,6 +6,13 @@
 
 # PyTorch Implementation of Denoising Diffusion Probabilistic Models [[paper]](https://arxiv.org/abs/2006.11239) [[official repo]](https://github.com/hojonathanho/diffusion)
 
+> Modified to support [Classifier-Free Guidance](https://arxiv.org/abs/2207.12598)
+
+> | guidance_w = 1.0  | guidance_w = 0.0 |
+> | ------------- | ------------- |
+> | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-0_gw-1.png">  | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-0_gw-0.png">  |
+> | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-1_gw-1.png">  | <img alt="banner" src="./assets/conditional_ddpm_mnist_4/c-1_gw-0.png">   |
+
 ## Features
 
 - [x] Original DDPM[^1] training & sampling
@@ -14,6 +21,7 @@
 	- [x] Fréchet Inception Distance[^3] (FID)
 	- [x] Precision & Recall[^4]
 - [x] Distributed Data Parallel[^5] (DDP) multi-GPU training
+- > [x] Classifier-Free Guidance
 
 ## Requirements
 

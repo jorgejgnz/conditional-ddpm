@@ -12,7 +12,8 @@
     "ch_multipliers": [1, 2, 2, 2],
     "num_res_blocks": 2,
     "apply_attn": [false, false, true, false],
-    "drop_rate": 0.0
+    "drop_rate": 0.0,
+    "c_value_range": [-1.0, 1.0]
   },
   "diffusion": {
     "timesteps": 1000,

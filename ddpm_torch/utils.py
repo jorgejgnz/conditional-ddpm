@@ -140,19 +140,5 @@ class EMA:
             "num_updates": self.num_updates
         }
 
-    @property
-    def extra_states(self):
-        return {"decay", "num_updates"}
-
-    def load_state_dict(self, state_dict, strict=True):
-        _dict_keys = set(self.__dict__["shadow"]).union(self.extra_states)
-        dict_keys = set(state_dict["shadow"]).union(self.extra_states)
-        incompatible_keys = set.symmetric_difference(_dict_keys, dict_keys) \
-            if strict else set.difference(_dict_keys, dict_keys)
-        if incompatible_keys:
-            raise RuntimeError(
-                "Key mismatch!\n"
-                f"Missing key(s): {', '.join(set.difference(_dict_keys, dict_keys))}."
-                f"Unexpected key(s): {', '.join(set.difference(dict_keys, _dict_keys))}"
-            )
+    def load_state_dict(self, state_dict):
         self.__dict__.update(state_dict)

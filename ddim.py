@@ -86,11 +86,12 @@ class DDIM(ddpm_torch.GaussianDiffusion):
         self.subsequence = torch.as_tensor(subsequence)
 
     @torch.inference_mode()
-    def p_sample(self, denoise_fn, shape, device=torch.device("cpu"), noise=None):
+    def p_sample(self, denoise_fn, c, guide_w, shape, device=torch.device("cpu"), noise=None):
+
         S = len(self.subsequence)
         B, *_ = shape
         subsequence = self.subsequence.to(device)
-        _denoise_fn = lambda x, t: denoise_fn(x, subsequence[t])
+        _denoise_fn = lambda x, t, c, guide_w: denoise_fn(x, subsequence[t], c, guide_w)
         t = torch.empty((B, ), dtype=torch.int64, device=device)
         if noise is None:
             x_t = torch.randn(shape, device=device)
@@ -98,7 +99,7 @@ class DDIM(ddpm_torch.GaussianDiffusion):
             x_t = noise.to(device)
         for ti in range(S - 1, -1, -1):
             t.fill_(ti)
-            x_t = self.p_sample_step(_denoise_fn, x_t, t)
+            x_t = self.p_sample_step(_denoise_fn, x_t, t, c, guide_w)
         return x_t
 
     @staticmethod
