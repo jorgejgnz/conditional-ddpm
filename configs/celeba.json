@@ -4,7 +4,8 @@
     "batch_size": 64,
     "grad_norm": 1.0,
     "epochs": 100,
-    "warmup": 5000
+    "warmup": 5000,
+    "emb_tensor_filename": "./embeddings/celeba_inception-resnet-v1-vggface2.pt"
   },
   "denoise": {
     "in_channels": 3,

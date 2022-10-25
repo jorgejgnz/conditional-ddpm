@@ -4,7 +4,8 @@
     "batch_size": 128,
     "grad_norm": 1.0,
     "epochs": 100,
-    "warmup": 5000
+    "warmup": 5000,
+    "emb_tensor_filename":""
   },
   "denoise": {
     "in_channels": 1,

@@ -28,7 +28,7 @@ class CelebA(datasets.VisionDataset):
             split,
             download=False,
             transform=transforms.ToTensor(),
-            emb_tensor_filename='celeba-embeddings-tensor_inception-resnet-v1-vggface2.pt'
+            emb_tensor_filename=None
     ):
         super().__init__(root, transform=transform)
         self.split = split
@@ -177,7 +177,8 @@ def get_dataloader(
         pin_memory=False,
         drop_last=False,
         num_workers=0,
-        distributed=False
+        distributed=False,
+        emb_tensor_filename=None
 ):
     assert isinstance(val_size, float) and 0 <= val_size < 1
     transform = DATA_INFO[dataset]["transform"]
@@ -188,7 +189,7 @@ def get_dataloader(
         "num_workers": num_workers
     }
     if dataset == "celeba":
-        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform)
+        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform, emb_tensor_filename=emb_tensor_filename)
     else:
         if split == "test":
             data = DATA_INFO[dataset]["data"](

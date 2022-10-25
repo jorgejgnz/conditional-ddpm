@@ -33,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--skip-schedule", default="linear", type=str)
     parser.add_argument("--subseq-size", default=10, type=int)
     parser.add_argument("--suffix", default="", type=str)
+    
     parser.add_argument("--guide-w", default=1.0, type=float)
     parser.add_argument("--c", default=1.0, type=float)
 

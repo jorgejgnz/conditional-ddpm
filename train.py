@@ -46,6 +46,7 @@ def main(args):
     epochs = gettr("epochs")
     grad_norm = gettr("grad_norm")
     warmup = gettr("warmup")
+    emb_tensor_filename = gettr("emb_tensor_filename")
     train_device = torch.device(args.train_device)
     eval_device = torch.device(args.eval_device)
 
@@ -98,7 +99,8 @@ def main(args):
     num_workers = args.num_workers
     trainloader, sampler = get_dataloader(
         dataset, batch_size=batch_size, split=split, val_size=0., random_seed=seed,
-        root=root, drop_last=True, pin_memory=True, num_workers=num_workers, distributed=distributed
+        root=root, drop_last=True, pin_memory=True, num_workers=num_workers, distributed=distributed,
+        emb_tensor_filename=emb_tensor_filename
     )  # drop_last to have a static input shape; num_workers > 0 to enable asynchronous data loading
 
     if args.summary:
@@ -211,6 +213,7 @@ if __name__ == "__main__":
     parser.add_argument("--use-ema", action="store_true", help="whether to use exponential moving average")
     parser.add_argument("--ema-decay", default=0.9999, type=float, help="decay factor of ema")
     parser.add_argument("--distributed", action="store_true", help="whether to use distributed training")
+    
     parser.add_argument("--summary", action="store_true", help="show summary of the model")
 
     main(parser.parse_args())
