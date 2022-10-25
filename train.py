@@ -180,6 +180,9 @@ def main(args):
     logger("Training starts...", flush=True)
     trainer.train(evaluator, chkpt_path=chkpt_path, image_dir=image_dir, sample_0=args.sample_0)
 
+    if args.shutdown:
+        os.system("shutdown now -h")
+
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -216,5 +219,6 @@ if __name__ == "__main__":
     
     parser.add_argument("--summary", action="store_true", help="show summary of the model")
     parser.add_argument("--sample-0", action="store_true", help="whether to sample even before starting training")
+    parser.add_argument("--shutdown", action="store_true", help="whether to shutdown computer after training (only Linux)")
 
     main(parser.parse_args())
