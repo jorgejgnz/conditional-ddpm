@@ -178,7 +178,7 @@ def main(args):
         logger(f"cuDNN benchmark: ON")
 
     logger("Training starts...", flush=True)
-    trainer.train(evaluator, chkpt_path=chkpt_path, image_dir=image_dir)
+    trainer.train(evaluator, chkpt_path=chkpt_path, image_dir=image_dir, sample_0=args.sample_0)
 
 
 if __name__ == "__main__":
@@ -215,5 +215,6 @@ if __name__ == "__main__":
     parser.add_argument("--distributed", action="store_true", help="whether to use distributed training")
     
     parser.add_argument("--summary", action="store_true", help="show summary of the model")
+    parser.add_argument("--sample-0", action="store_true", help="whether to sample even before starting training")
 
     main(parser.parse_args())

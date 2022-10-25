@@ -139,7 +139,7 @@ class Trainer:
         assert sample.grad is None
         return sample
 
-    def train(self, evaluator=None, chkpt_path=None, image_dir=None):
+    def train(self, evaluator=None, chkpt_path=None, image_dir=None, sample_0=False):
 
         num_samples = self.num_save_images
         if num_samples:
@@ -152,8 +152,10 @@ class Trainer:
             sample_emb = sample_emb[:, None]
             sample_emb = sample_emb.repeat(1,C_IN_DIM).type(torch.float)
         sample_emb = sample_emb.repeat(num_samples,1) # [1, emb_dim] -> [num_samples, emb_dim]
-        x = self.sample_fn(noise, sample_emb).cpu()
-        save_image(x, os.path.join(image_dir, f"0.jpg"))
+
+        if sample_0:
+            x = self.sample_fn(noise, sample_emb).cpu()
+            save_image(x, os.path.join(image_dir, f"0.jpg"))
 
         for e in range(self.start_epoch, self.epochs):
             self.stats.reset()
