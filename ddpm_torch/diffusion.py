@@ -4,7 +4,6 @@ import torch
 from tqdm.auto import tqdm
 from .functions import normal_kl, discretized_gaussian_loglik, flat_mean
 
-
 def _warmup_beta(beta_start, beta_end, num_diffusion_timesteps, warmup_frac):
     betas = beta_end * np.ones(num_diffusion_timesteps, dtype=np.float64)
     warmup_time = int(num_diffusion_timesteps * warmup_frac)

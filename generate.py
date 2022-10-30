@@ -13,9 +13,7 @@ if __name__ == "__main__":
     from ddim import DDIM, get_selection_schedule
     from argparse import ArgumentParser
 
-    C_IN_DIM = 512
-
-    # python generate.py --dataset mnist --c 1.0 --guide-w 1.0 --batch-size 6 --total-size 6 --chkpt-path chkpts/conditional_ddpm_mnist_4.pt --device cuda:0
+    # python generate.py --dataset celeba --c 1.0 --guide-w 1.0 --batch-size 6 --total-size 6 --chkpt-path chkpts/ddpm_celeba_26.pt --device cuda:0
 
     parser = ArgumentParser()
     parser.add_argument("--root", default="~/datasets", type=str)
@@ -68,7 +66,7 @@ if __name__ == "__main__":
         diffusion = GaussianDiffusion(betas, **diffusion_kwargs)
 
     device = torch.device(args.device)
-    model = UNet(out_channels=in_channels, c_in_dim=C_IN_DIM, **configs["denoise"])
+    model = UNet(out_channels=in_channels, **configs["denoise"])
     model.to(device)
     chkpt_dir = args.chkpt_dir
     chkpt_path = args.chkpt_path or os.path.join(chkpt_dir, f"ddpm_{dataset}.pt")
@@ -103,10 +101,10 @@ if __name__ == "__main__":
         for i in trange(num_eval_batches):
             if i == num_eval_batches - 1:
                 shape = (total_size - i * batch_size, in_channels, image_res, image_res)
-                c = torch.ones((shape[0], C_IN_DIM)) * args.c
+                c = torch.ones((shape[0], configs["denoise"]["c_in_dim"])) * args.c
                 x = diffusion.p_sample(model, c=c, guide_w=args.guide_w, shape=shape, device=device, noise=torch.randn(shape, device=device)).cpu()
             else:
-                c = torch.ones((shape[0], C_IN_DIM)) * args.c
+                c = torch.ones((shape[0], configs["denoise"]["c_in_dim"])) * args.c
                 x = diffusion.p_sample(model, c=c, guide_w=args.guide_w, shape=shape, device=device, noise=torch.randn(shape, device=device)).cpu()
             x = (x * 127.5 + 127.5).clamp(0, 255).to(torch.uint8)
 

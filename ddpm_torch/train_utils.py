@@ -2,7 +2,6 @@ import os
 import torch
 import torch.nn as nn
 
-from ddpm_torch.datasets import C_IN_DIM
 from .utils import save_image, EMA
 from .metrics.fid_score import InceptionStatistics, get_precomputed, calc_fd
 from tqdm import tqdm
@@ -139,7 +138,7 @@ class Trainer:
         assert sample.grad is None
         return sample
 
-    def train(self, evaluator=None, chkpt_path=None, image_dir=None, sample_0=False):
+    def train(self, evaluator=None, chkpt_path=None, image_dir=None, sample_0=False, c_in_dim=512):
 
         num_samples = self.num_save_images
         if num_samples:
@@ -148,9 +147,9 @@ class Trainer:
         _, sample_emb = next(iter(self.trainloader))
         sample_emb = sample_emb[:1] # [batch_size, {emb_dim}] -> [1, {emb_dim}]
         if sample_emb.ndim == 1:
-            # emb for mnist and cifar10 is [B,] and should be [B,C_IN_DIM]
+            # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
             sample_emb = sample_emb[:, None]
-            sample_emb = sample_emb.repeat(1,C_IN_DIM).type(torch.float)
+            sample_emb = sample_emb.repeat(1,c_in_dim).type(torch.float)
         sample_emb = sample_emb.repeat(num_samples,1) # [1, emb_dim] -> [num_samples, emb_dim]
 
         if sample_0:
@@ -165,9 +164,9 @@ class Trainer:
             with tqdm(self.trainloader, desc=f"{e+1}/{self.epochs} epochs", disable=not self.is_main) as t:
                 for i, (x, emb) in enumerate(t):
                     if emb.ndim == 1:
-                        # emb for mnist and cifar10 is [B,] and should be [B,C_IN_DIM]
+                        # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
                         emb = emb[:, None]
-                        emb = emb.repeat(1,C_IN_DIM).type(torch.float)
+                        emb = emb.repeat(1,c_in_dim).type(torch.float)
                     self.step(x.to(self.device), emb.to(self.device))
                     t.set_postfix(self.current_stats)
                     if i == len(self.trainloader) - 1:

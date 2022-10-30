@@ -9,8 +9,6 @@ from torch.utils.data.distributed import DistributedSampler
 from collections import namedtuple
 
 CSV = namedtuple("CSV", ["header", "index", "data"])
-CONDITIONAL = False
-C_IN_DIM = 512
 
 def crop_celeba(img):
     return transforms.functional.crop(img, top=40, left=15, height=148, width=148)
@@ -28,7 +26,8 @@ class CelebA(datasets.VisionDataset):
             split,
             download=False,
             transform=transforms.ToTensor(),
-            emb_tensor_filename=None
+            emb_tensor_filename=None,
+            names_np_filename=None
     ):
         super().__init__(root, transform=transform)
         self.split = split
@@ -50,6 +49,7 @@ class CelebA(datasets.VisionDataset):
         ###########################################
         ## Load emb_tensor
         self.embs_tensor = torch.load(emb_tensor_filename)
+        self.c_in_dim = self.embs_tensor.shape[1]
         ###########################################
 
     def _load_csv(
@@ -80,7 +80,8 @@ class CelebA(datasets.VisionDataset):
             X = self.transform(X)
 
         ###########################################
-        emb = self.embs_tensor[index].to(X.device)
+        emb = self.embs_tensor[index]
+        emb = emb.type(torch.float).to(X.device)
         ###########################################
 
         return X, emb
@@ -121,7 +122,7 @@ DATA_INFO = {
         "test_size": 10000
     },
     "celeba": {
-        "data": datasets.CelebA if CONDITIONAL else CelebA,
+        "data": CelebA,
         "resolution": (64, 64),
         "channels": 3,
         "transform": transforms.Compose([
@@ -178,7 +179,9 @@ def get_dataloader(
         drop_last=False,
         num_workers=0,
         distributed=False,
-        emb_tensor_filename=None
+
+        emb_tensor_filename=None,
+        names_np_filename=None
 ):
     assert isinstance(val_size, float) and 0 <= val_size < 1
     transform = DATA_INFO[dataset]["transform"]
@@ -189,7 +192,7 @@ def get_dataloader(
         "num_workers": num_workers
     }
     if dataset == "celeba":
-        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform, emb_tensor_filename=emb_tensor_filename)
+        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform, emb_tensor_filename=emb_tensor_filename, names_np_filename=names_np_filename)
     else:
         if split == "test":
             data = DATA_INFO[dataset]["data"](

@@ -5,7 +5,7 @@
     "grad_norm": 1.0,
     "epochs": 100,
     "warmup": 5000,
-    "emb_tensor_filename": "./embeddings/celeba_inception-resnet-v1-vggface2.pt"
+    "emb_tensor_filename": "./embeddings/celeba_attributes.pt"
   },
   "denoise": {
     "in_channels": 3,
@@ -14,6 +14,7 @@
     "num_res_blocks": 2,
     "apply_attn": [false, false, true, false],
     "drop_rate": 0.0,
+    "c_in_dim": 40,
     "c_value_range": [-1.0, 1.0]
   },
   "diffusion": {

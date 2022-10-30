@@ -14,6 +14,7 @@
     "num_res_blocks": 2,
     "apply_attn": [false, true, false, false],
     "drop_rate": 0.1,
+    "c_in_dim": 512,
     "c_value_range": [0.0, 9.0]
   },
   "diffusion": {

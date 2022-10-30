@@ -11,8 +11,6 @@ from functools import partial
 
 from torchsummaryX import summary
 
-C_IN_DIM = 512
-
 # python train.py --dataset mnist --batch-size 16 --num-workers 8 --train-device cuda:0 --epochs 50 --chkpt-intv 1 --summary
 
 @errors.record
@@ -71,9 +69,10 @@ def main(args):
 
     # denoise parameters
     getden = partial(get_param, configs_1=configs.get("denoise", {}), configs_2=args)
+    c_in_dim = getden("c_in_dim")
 
     out_channels = 2 * in_channels if model_var_type == "learned" else in_channels
-    _model = UNet(out_channels=out_channels, c_in_dim=C_IN_DIM, **configs["denoise"])
+    _model = UNet(out_channels=out_channels, **configs["denoise"])
 
     if distributed:
         # check whether torch.distributed is available
@@ -108,9 +107,9 @@ def main(args):
       dummy_x = dummy_x.to(train_device)
 
       if dummy_c.ndim == 1:
-        # emb for mnist and cifar10 is [B,] and should be [B,C_IN_DIM]
+        # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
         dummy_c = dummy_c[:, None]
-        dummy_c = dummy_c.repeat(1,C_IN_DIM).type(torch.float)
+        dummy_c = dummy_c.repeat(1,c_in_dim).type(torch.float)
 
       dummy_c = dummy_c.to(train_device)
       dummy_t = torch.rand(dummy_x.shape[0],).to(train_device)
@@ -163,11 +162,11 @@ def main(args):
     )
     evaluator = Evaluator(dataset=dataset, device=eval_device) if args.eval else None
     # in case of elastic launch, resume should always be turned on
-    resume = args.resume or distributed
+    resume = args.resume_from is not None or distributed
     if resume:
         try:
             map_location = {"cuda:0": f"cuda:{local_rank}"} if distributed else train_device
-            trainer.resume_from_chkpt(chkpt_path, map_location=map_location)
+            trainer.resume_from_chkpt(args.resume_from, map_location=map_location)
         except FileNotFoundError:
             logger("Checkpoint file does not exist!")
             logger("Starting from scratch...")
@@ -178,7 +177,7 @@ def main(args):
         logger(f"cuDNN benchmark: ON")
 
     logger("Training starts...", flush=True)
-    trainer.train(evaluator, chkpt_path=chkpt_path, image_dir=image_dir, sample_0=args.sample_0)
+    trainer.train(evaluator, chkpt_path=chkpt_path, image_dir=image_dir, sample_0=args.sample_0, c_in_dim=c_in_dim)
 
     if args.shutdown:
         os.system("shutdown now -h")
@@ -211,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument("--chkpt-dir", default="./chkpts", type=str)
     parser.add_argument("--chkpt-intv", default=5, type=int, help="frequency of saving a checkpoint")
     parser.add_argument("--seed", default=1234, type=int, help="random seed")
-    parser.add_argument("--resume", action="store_true", help="to resume from a checkpoint")
+    parser.add_argument("--resume-from", default=None, type=str, help="to resume from a checkpoint")
     parser.add_argument("--eval", action="store_true", help="whether to evaluate fid during training")
     parser.add_argument("--use-ema", action="store_true", help="whether to use exponential moving average")
     parser.add_argument("--ema-decay", default=0.9999, type=float, help="decay factor of ema")
