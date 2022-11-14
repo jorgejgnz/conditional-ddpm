@@ -88,6 +88,18 @@ def split_squeeze(data):
     return x, y
 
 
+def parse_cond_file(file_path):
+    content = []
+    with open(file_path) as f:
+        for line in f:
+            line = line.strip()
+            print(line)
+            name, value = line.split(' ')
+            content.append((name,float(value)))
+    return torch.FloatTensor([pair[1] for pair in content])
+
+
+
 class EMA:
     """
     exponential moving average

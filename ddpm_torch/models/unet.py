@@ -131,7 +131,7 @@ class UNet(nn.Module):
             num_groups=32,
             drop_rate=0.,
             resample_with_conv=True,
-            c_value_range=[0.0,1.0] # [0, n_classes]
+            c_value_range=None # [0, n_classes]
     ):
         super(UNet, self).__init__()
         self.in_channels = in_channels
@@ -238,13 +238,14 @@ class UNet(nn.Module):
             modules.append(Sequential(*upsample))
         return modules
 
-    def forward(self, x, t, c, c_shape, debug=False):
+    def forward(self, x, t, c, c_shape, c_guidance_drop=0.1, debug=False): ################################# c_guidance_drop
 
         t_emb = get_timestep_embedding(t, self.hid_channels)
         t_emb = self.t_embed(t_emb)
 
         if c is None:
-            c = torch.rand(c_shape) * (self.c_value_range[1] - self.c_value_range[0]) + self.c_value_range[0] # if unconditional: make c irrelevant
+            #c = torch.rand(c_shape) * (self.c_value_range[1] - self.c_value_range[0]) + self.c_value_range[0] # if unconditional: make c irrelevant
+            c = torch.bernoulli(torch.ones(c_shape) * c_guidance_drop) * (self.c_value_range[1] - self.c_value_range[0]) + self.c_value_range[0]
             c = c.to(x.device)
 
         assert c.shape[1] == self.c_in_dim, f"ASSERT FAILED: c.shape[-1]={c.shape[-1]} but self.c_in_dim={self.c_in_dim}"

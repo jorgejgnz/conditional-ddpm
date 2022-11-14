@@ -81,6 +81,7 @@ class CelebA(datasets.VisionDataset):
 
         ###########################################
         emb = self.embs_tensor[index]
+        emb = torch.gather(emb, 0, torch.tensor([15, 20, 26, 39])) ########### ONLY [eyeglasses, male, pale_skin, young]
         emb = emb.type(torch.float).to(X.device)
         ###########################################
 
