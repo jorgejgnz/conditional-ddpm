@@ -237,7 +237,7 @@ class GaussianDiffusion:
             c = None
 
         # [0.0,0.0,0.0,...] + 0.25 -> [0.25,0.25,0.25,...] -> [binary]
-        #c = torch.bernoulli(torch.zeros_like(c) + self.c_guidance_drop).to(x_t.device) # dropout context with some probability
+        # c = torch.bernoulli(torch.zeros_like(c) + self.c_guidance_drop).to(x_t.device) # dropout context with some probability
 
         # calculate the loss
         # kl: weighted

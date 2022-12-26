@@ -50,6 +50,19 @@ class CelebA(datasets.VisionDataset):
         ## Load emb_tensor
         self.embs_tensor = torch.load(emb_tensor_filename)
         self.c_in_dim = self.embs_tensor.shape[1]
+
+        self.labels = [(4,'Bald'),  #0
+            (8,'Black_Hair'),       #1
+            (9,'Blonde_Hair'),      #2
+            (11,'Brown_Hair'),      #3
+            (15,'Eyeglasses'),      #4
+            (17,'Gray_Hair'),       #5
+            (20,'Male')]            #6
+
+        """
+        self.labels = [(20,'Male')] #0
+        """
+
         ###########################################
 
     def _load_csv(
@@ -81,8 +94,10 @@ class CelebA(datasets.VisionDataset):
 
         ###########################################
         emb = self.embs_tensor[index]
-        emb = torch.gather(emb, 0, torch.tensor([15, 20, 26, 39])) ########### ONLY [eyeglasses, male, pale_skin, young]
+        emb = torch.gather(emb, 0, torch.tensor([l[0]for l in self.labels]))
         emb = emb.type(torch.float).to(X.device)
+
+        emb = emb / 2.0 + 0.5 # [-1,1] -> [-0.5,0.5] -> [0,1]
         ###########################################
 
         return X, emb
@@ -127,15 +142,15 @@ DATA_INFO = {
         "resolution": (64, 64),
         "channels": 3,
         "transform": transforms.Compose([
-            crop_celeba,
-            transforms.Resize((64, 64)),
+            #crop_celeba,                                                   # Cropped and rescaled in preprocessing to shorten memory read times
+            #transforms.Resize((64, 64)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ]),
         "_transform": transforms.Compose([
-            crop_celeba,
-            transforms.Resize((64, 64)),
+            #crop_celeba,
+            #transforms.Resize((64, 64)),
             transforms.PILToTensor()
         ]),
         "train": 162770,
@@ -206,6 +221,7 @@ def get_dataloader(
             else:
                 train_inds, val_inds = train_val_split(dataset, val_size, random_seed)
                 data = Subset(data, {"train": train_inds, "valid": val_inds}[split])
+
     dataloader_configs["sampler"] = sampler = DistributedSampler(
         data, shuffle=True, seed=random_seed, drop_last=drop_last) if distributed else None
     dataloader_configs["shuffle"] = (sampler is None) if split in {"train", "all"} else False

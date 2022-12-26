@@ -41,12 +41,17 @@ def main(args):
     gettr = partial(get_param, configs_1=configs.get("train", {}), configs_2=args)
     beta1, beta2 = gettr("beta1"), gettr("beta2")
     lr = gettr("lr")
-    epochs = gettr("epochs")
+    
     grad_norm = gettr("grad_norm")
     warmup = gettr("warmup")
     emb_tensor_filename = gettr("emb_tensor_filename")
     train_device = torch.device(args.train_device)
     eval_device = torch.device(args.eval_device)
+
+    if args.epochs > 0:
+        epochs = args.epochs
+    else:
+        epochs = gettr("epochs")
 
     if args.batch_size is None:  
       batch_size = gettr("batch_size")
@@ -109,6 +114,7 @@ def main(args):
       if dummy_c.ndim == 1:
         # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
         dummy_c = dummy_c[:, None]
+      if dummy_c.ndim <= 2:
         dummy_c = dummy_c.repeat(1,c_in_dim).type(torch.float)
 
       dummy_c = dummy_c.to(train_device)
@@ -189,7 +195,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--dataset", choices=["mnist", "cifar10", "celeba"], default="cifar10")
     #parser.add_argument("--root", default="~/datasets", type=str, help="root directory of datasets")
-    parser.add_argument("--epochs", default=50, type=int, help="total number of training epochs")
+    parser.add_argument("--epochs", default=-1, type=int, help="total number of training epochs")
     parser.add_argument("--lr", default=0.0002, type=float, help="learning rate")
     parser.add_argument("--beta1", default=0.9, type=float, help="beta_1 in Adam")
     parser.add_argument("--beta2", default=0.999, type=float, help="beta_2 in Adam")

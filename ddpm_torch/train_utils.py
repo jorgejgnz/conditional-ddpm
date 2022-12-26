@@ -103,6 +103,8 @@ class Trainer:
 
         self.stats = RunningStatistics(loss=None)
 
+        self.stats_log = [] # saved in chkpt as 'stats_log':[{'loss': 1.003756324450175,...},...]
+
     def loss(self, x, emb):
         B = x.shape[0]
         T = self.diffusion.timesteps
@@ -146,9 +148,11 @@ class Trainer:
 
         _, sample_emb = next(iter(self.trainloader))
         sample_emb = sample_emb[:1] # [batch_size, {emb_dim}] -> [1, {emb_dim}]
+        
         if sample_emb.ndim == 1:
             # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
             sample_emb = sample_emb[:, None]
+        if sample_emb.ndim <= 2:
             sample_emb = sample_emb.repeat(1,c_in_dim).type(torch.float)
         sample_emb = sample_emb.repeat(num_samples,1) # [1, emb_dim] -> [num_samples, emb_dim]
 
@@ -163,22 +167,31 @@ class Trainer:
                 self.sampler.set_epoch(e)
             with tqdm(self.trainloader, desc=f"{e+1}/{self.epochs} epochs", disable=not self.is_main) as t:
                 for i, (x, emb) in enumerate(t):
+
                     if emb.ndim == 1:
                         # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
                         emb = emb[:, None]
+                    if emb.ndim <= 2:
                         emb = emb.repeat(1,c_in_dim).type(torch.float)
+                        
                     self.step(x.to(self.device), emb.to(self.device))
                     t.set_postfix(self.current_stats)
+
                     if i == len(self.trainloader) - 1:
                         self.model.eval()
                         if evaluator is not None:
                             eval_results = evaluator.eval(self.sample_fn)
                         else:
                             eval_results = dict()
+
                         results = dict()
                         results.update(self.current_stats)
                         results.update(eval_results)
                         t.set_postfix(results)
+
+            self.stats_log.append(self.stats.extract())
+            results.update({'stats_log':self.stats_log})
+
             if self.is_main:
                 if not (e + 1) % self.chkpt_intv and chkpt_path:
                     self.save_checkpoint(chkpt_path, epoch=e+1, **results)

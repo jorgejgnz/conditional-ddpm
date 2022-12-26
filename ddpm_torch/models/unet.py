@@ -238,7 +238,7 @@ class UNet(nn.Module):
             modules.append(Sequential(*upsample))
         return modules
 
-    def forward(self, x, t, c, c_shape, c_guidance_drop=0.1, debug=False): ################################# c_guidance_drop
+    def forward(self, x, t, c, c_shape, c_guidance_drop=0.1, debug=False):
 
         t_emb = get_timestep_embedding(t, self.hid_channels)
         t_emb = self.t_embed(t_emb)
@@ -262,15 +262,15 @@ class UNet(nn.Module):
         for i in range(self.levels):
             downsample = self.downsamples[f"level_{i}"]
             for j, layer in enumerate(downsample):
-                h = hs[-1]                                                      ### ???
+                h = hs[-1]
                 s = layer.__class__.__name__
                 if s == "Sequential":
                     s += '(' + ','.join([l.__class__.__name__ for l in layer]) + ')'
-                if j != self.num_res_blocks:                                    ### ???
+                if j != self.num_res_blocks:
                     hs.append(layer(h, t_emb=t_emb, c_emb=c_emb))
                     debug_names.append(s+"(h,t_emb,c_emb)")
                 else:
-                    hs.append(layer(h))                                         ### ???
+                    hs.append(layer(h))
                     debug_names.append(s+"(h)")
                 debug_shapes.append(hs[-1].shape)
 
@@ -305,13 +305,13 @@ class UNet(nn.Module):
                 s_name = layer.__class__.__name__
                 if s_name == "Sequential":
                     s_name += '(' + ','.join([l.__class__.__name__ for l in layer]) + ')'
-                if j != self.num_res_blocks + 1:                                ### ???
+                if j != self.num_res_blocks + 1:
                     s_shape = f"cat[{h.shape},{hs[-1].shape}]"
-                    h = layer(torch.cat([h, hs.pop()], dim=1), t_emb=t_emb, c_emb=c_emb)     ### ???
+                    h = layer(torch.cat([h, hs.pop()], dim=1), t_emb=t_emb, c_emb=c_emb)
                     debug_names.append(s_name+"(h+hs[-1],t_emb,c_emb)")
                     debug_shapes.append(s_shape + " -> " + str(h.shape))
                 else:
-                    h = layer(h)                                                ### ???
+                    h = layer(h)
                     debug_names.append(s_name+"(h)")
                     debug_shapes.append(h.shape)
 
