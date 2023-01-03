@@ -153,9 +153,6 @@ class Trainer:
 
         assert c_tensor.shape[1] == c_in_dim, f"ASSERT ERROR: c_tensor ({c_tensor.shape[1]}) and c_in_dim ({c_in_dim}) are not equal"
 
-        c_tensor = self.sample_c[:, None]
-        c_tensor = c_tensor.repeat(num_samples,1).to(self.device) # [1, emb_dim] -> [num_samples, emb_dim]
-        
         if sample_0:
             x = self.sample_fn(noise, c_tensor).cpu()
             save_image(x, os.path.join(image_dir, f"0.jpg"))
@@ -167,6 +164,12 @@ class Trainer:
                 self.sampler.set_epoch(e)
             with tqdm(self.trainloader, desc=f"{e+1}/{self.epochs} epochs", disable=not self.is_main) as t:
                 for i, (x, emb) in enumerate(t):
+
+                    if emb.ndim == 1:
+                        # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
+                        emb = emb[:, None]
+                    if emb.ndim <= 2:
+                        emb = emb.repeat(1,c_in_dim).type(torch.float)
 
                     self.step(x.to(self.device), emb.to(self.device))
                     t.set_postfix(self.current_stats)

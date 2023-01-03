@@ -12,7 +12,7 @@ from functools import partial
 from torchsummaryX import summary
 from ddpm_torch.utils import parse_cond_file
 
-# python train.py --dataset mnist --batch-size 16 --num-workers 8 --train-device cuda:0 --epochs 50 --chkpt-intv 1 --summary
+# python train.py --dataset mnist --batch-size 16 --num-workers 8 --train-device cuda:0 --epochs 50 --chkpt-intv 1 --summary --c-file debug/mnist/cond.txt
 
 @errors.record
 def main(args):
@@ -153,7 +153,7 @@ def main(args):
         # parse file
         sample_c = parse_cond_file(args.c_file)
     else:
-        sample_c = torch.ones((configs["denoise"]["c_in_dim"],)) * args.c
+        sample_c = torch.ones((configs["denoise"]["c_in_dim"],))
 
     trainer = Trainer(
         model=model,
