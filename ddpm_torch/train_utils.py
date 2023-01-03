@@ -148,7 +148,10 @@ class Trainer:
         if num_samples:
             noise = torch.randn((num_samples,) + self.shape)  # fixed x_T for image generation
 
-        assert c_tensor.shape[0] == c_in_dim, f"ASSERT ERROR: c_tensor ({c_tensor.shape[0]}) and c_in_dim ({c_in_dim}) are not equal"
+        c_tensor = self.sample_c[:, None]
+        c_tensor = c_tensor.repeat(num_samples,1).to(self.device) # [1, emb_dim] -> [num_samples, emb_dim]
+
+        assert c_tensor.shape[1] == c_in_dim, f"ASSERT ERROR: c_tensor ({c_tensor.shape[1]}) and c_in_dim ({c_in_dim}) are not equal"
 
         c_tensor = self.sample_c[:, None]
         c_tensor = c_tensor.repeat(num_samples,1).to(self.device) # [1, emb_dim] -> [num_samples, emb_dim]
