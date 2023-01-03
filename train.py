@@ -10,6 +10,7 @@ from torch.distributed.elastic.multiprocessing import errors
 from functools import partial
 
 from torchsummaryX import summary
+from ddpm_torch.utils import parse_cond_file
 
 # python train.py --dataset mnist --batch-size 16 --num-workers 8 --train-device cuda:0 --epochs 50 --chkpt-intv 1 --summary
 
@@ -148,6 +149,12 @@ def main(args):
     num_save_images = args.num_save_images
     logger(f"Generated images (x{num_save_images}) will be saved to {os.path.abspath(image_dir)}")
 
+    if args.c_file is not None:
+        # parse file
+        sample_c = parse_cond_file(args.c_file)
+    else:
+        sample_c = torch.ones((configs["denoise"]["c_in_dim"],)) * args.c
+
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -155,6 +162,7 @@ def main(args):
         epochs=epochs,
         trainloader=trainloader,
         sampler=sampler,
+        sample_c=sample_c,
         scheduler=scheduler,
         use_ema=args.use_ema,
         grad_norm=grad_norm,
@@ -193,7 +201,7 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument("--dataset", choices=["mnist", "cifar10", "celeba"], default="cifar10")
+    parser.add_argument("--dataset", choices=["mnist", "cifar10", "celeba", "custom-mnist"], default="cifar10")
     #parser.add_argument("--root", default="~/datasets", type=str, help="root directory of datasets")
     parser.add_argument("--epochs", default=-1, type=int, help="total number of training epochs")
     parser.add_argument("--lr", default=0.0002, type=float, help="learning rate")
@@ -222,6 +230,7 @@ if __name__ == "__main__":
     parser.add_argument("--ema-decay", default=0.9999, type=float, help="decay factor of ema")
     parser.add_argument("--distributed", action="store_true", help="whether to use distributed training")
     
+    parser.add_argument("--c-file", default=None, type=str)
     parser.add_argument("--summary", action="store_true", help="show summary of the model")
     parser.add_argument("--sample-0", action="store_true", help="whether to sample even before starting training")
     parser.add_argument("--shutdown", action="store_true", help="whether to shutdown computer after training (only Linux)")

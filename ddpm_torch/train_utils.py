@@ -64,6 +64,7 @@ class Trainer:
             epochs,
             trainloader,
             sampler=None,
+            sample_c=None,
             scheduler=None,
             use_ema=False,
             grad_norm=1.0,
@@ -82,6 +83,7 @@ class Trainer:
         self.start_epoch = 0
         self.trainloader = trainloader
         self.sampler = sampler
+        self.sample_c = sample_c
         if shape is None:
             shape = next(iter(trainloader))[0].shape[1:]
         self.shape = shape
@@ -146,18 +148,13 @@ class Trainer:
         if num_samples:
             noise = torch.randn((num_samples,) + self.shape)  # fixed x_T for image generation
 
-        _, sample_emb = next(iter(self.trainloader))
-        sample_emb = sample_emb[:1] # [batch_size, {emb_dim}] -> [1, {emb_dim}]
-        
-        if sample_emb.ndim == 1:
-            # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
-            sample_emb = sample_emb[:, None]
-        if sample_emb.ndim <= 2:
-            sample_emb = sample_emb.repeat(1,c_in_dim).type(torch.float)
-        sample_emb = sample_emb.repeat(num_samples,1) # [1, emb_dim] -> [num_samples, emb_dim]
+        assert c_tensor.shape[0] == c_in_dim, f"ASSERT ERROR: c_tensor ({c_tensor.shape[0]}) and c_in_dim ({c_in_dim}) are not equal"
 
+        c_tensor = self.sample_c[:, None]
+        c_tensor = c_tensor.repeat(num_samples,1).to(self.device) # [1, emb_dim] -> [num_samples, emb_dim]
+        
         if sample_0:
-            x = self.sample_fn(noise, sample_emb).cpu()
+            x = self.sample_fn(noise, c_tensor).cpu()
             save_image(x, os.path.join(image_dir, f"0.jpg"))
 
         for e in range(self.start_epoch, self.epochs):
@@ -168,12 +165,6 @@ class Trainer:
             with tqdm(self.trainloader, desc=f"{e+1}/{self.epochs} epochs", disable=not self.is_main) as t:
                 for i, (x, emb) in enumerate(t):
 
-                    if emb.ndim == 1:
-                        # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
-                        emb = emb[:, None]
-                    if emb.ndim <= 2:
-                        emb = emb.repeat(1,c_in_dim).type(torch.float)
-                        
                     self.step(x.to(self.device), emb.to(self.device))
                     t.set_postfix(self.current_stats)
 
@@ -196,7 +187,7 @@ class Trainer:
                 if not (e + 1) % self.chkpt_intv and chkpt_path:
                     self.save_checkpoint(chkpt_path, epoch=e+1, **results)
                 if num_samples and image_dir:
-                    x = self.sample_fn(noise, sample_emb).cpu()
+                    x = self.sample_fn(noise, c_tensor).cpu()
                     save_image(x, os.path.join(image_dir, f"{e+1}.jpg"))
             if self.distributed:
                 dist.barrier()  # synchronize all processes here

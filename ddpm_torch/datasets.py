@@ -26,8 +26,7 @@ class CelebA(datasets.VisionDataset):
             split,
             download=False,
             transform=transforms.ToTensor(),
-            emb_tensor_filename=None,
-            names_np_filename=None
+            emb_tensor_filename=None
     ):
         super().__init__(root, transform=transform)
         self.split = split
@@ -51,6 +50,7 @@ class CelebA(datasets.VisionDataset):
         self.embs_tensor = torch.load(emb_tensor_filename)
         self.c_in_dim = self.embs_tensor.shape[1]
 
+        """
         self.labels = [(4,'Bald'),  #0
             (8,'Black_Hair'),       #1
             (9,'Blonde_Hair'),      #2
@@ -58,10 +58,9 @@ class CelebA(datasets.VisionDataset):
             (15,'Eyeglasses'),      #4
             (17,'Gray_Hair'),       #5
             (20,'Male')]            #6
+        """
 
-        """
-        self.labels = [(20,'Male')] #0
-        """
+        self.labels = [(15,'Eyeglasses')] #0
 
         ###########################################
 
@@ -110,6 +109,22 @@ class CelebA(datasets.VisionDataset):
         return "\n".join(lines).format(**self.__dict__)
 
 
+class CustomMNIST(datasets.ImageFolder):
+
+    def __init__(
+            self,
+            root,
+            split,
+            transform=transforms.ToTensor(),
+    ):
+        self.root = os.path.join(root, "CustomMNIST", "images", split) # datasets/CustomMNIST/images/{train,test}
+        super().__init__(self.root, transform=transform)
+        self.dataset = datasets.ImageFolder(self.root, transform)
+
+    def __getitem__(self, index):        
+        x, folder_name = super(datasets.ImageFolder, self).__getitem__(index)
+        return x, float(folder_name)
+
 DATA_INFO = {
     "mnist": {
         "data": datasets.MNIST,
@@ -156,7 +171,19 @@ DATA_INFO = {
         "train": 162770,
         "test": 19962,
         "validation": 19867
-    }
+    },
+    "custom-mnist": {
+        "data": CustomMNIST,
+        "resolution": (32, 32),
+        "channels": 3,
+        "transform": transforms.Compose([
+            transforms.Resize((32, 32)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, ), (0.5, ))
+        ]),
+        "train_size": 60000,
+        "test_size": 10000
+    },
 }
 
 ROOT = os.path.expanduser("~/datasets")
@@ -208,7 +235,9 @@ def get_dataloader(
         "num_workers": num_workers
     }
     if dataset == "celeba":
-        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform, emb_tensor_filename=emb_tensor_filename, names_np_filename=names_np_filename)
+        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform, emb_tensor_filename=emb_tensor_filename)
+    elif dataset == "custom-mnist":
+        data = DATA_INFO[dataset]["data"](root=root, split=split, transform=transform)
     else:
         if split == "test":
             data = DATA_INFO[dataset]["data"](
