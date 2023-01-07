@@ -148,7 +148,7 @@ class Trainer:
         if num_samples:
             noise = torch.randn((num_samples,) + self.shape)  # fixed x_T for image generation
 
-        c_tensor = self.sample_c[:, None]
+        c_tensor = self.sample_c[None, :] # extend sample dim
         c_tensor = c_tensor.repeat(num_samples,1).to(self.device) # [1, emb_dim] -> [num_samples, emb_dim]
 
         assert c_tensor.shape[1] == c_in_dim, f"ASSERT ERROR: c_tensor ({c_tensor.shape[1]}) and c_in_dim ({c_in_dim}) are not equal"
@@ -167,8 +167,7 @@ class Trainer:
 
                     if emb.ndim == 1:
                         # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
-                        emb = emb[:, None]
-                    if emb.ndim <= 2:
+                        emb = emb[:, None] # extend feature dim
                         emb = emb.repeat(1,c_in_dim).type(torch.float)
 
                     self.step(x.to(self.device), emb.to(self.device))

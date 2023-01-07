@@ -109,18 +109,19 @@ def main(args):
     )  # drop_last to have a static input shape; num_workers > 0 to enable asynchronous data loading
 
     if args.summary:
-      dummy_x, dummy_c = next(iter(trainloader))
-      dummy_x = dummy_x.to(train_device)
+        dummy_x, dummy_c = next(iter(trainloader))
+        dummy_x = dummy_x.to(train_device)
 
-      if dummy_c.ndim == 1:
-        # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
-        dummy_c = dummy_c[:, None]
-      if dummy_c.ndim <= 2:
-        dummy_c = dummy_c.repeat(1,c_in_dim).type(torch.float)
+        if dummy_c.ndim == 1:
+            # emb for mnist and cifar10 is [B,] and should be [B,c_in_dim]
+            dummy_c = dummy_c[:, None] # extend feature dim
+            dummy_c = dummy_c.repeat(1,c_in_dim).type(torch.float)
 
-      dummy_c = dummy_c.to(train_device)
-      dummy_t = torch.rand(dummy_x.shape[0],).to(train_device)
-      summary(_model, dummy_x, dummy_t, dummy_c, dummy_c.shape)
+        assert dummy_c.shape[1] == c_in_dim, f"ASSERT ERROR: dummy_c.shape[1] ({dummy_c.shape[1]}) and c_in_dim({c_in_dim}) are not equal"
+
+        dummy_c = dummy_c.to(train_device)
+        dummy_t = torch.rand(dummy_x.shape[0],).to(train_device)
+        summary(_model, dummy_x, dummy_t, dummy_c, dummy_c.shape)
 
     hps = {
         "lr": lr,

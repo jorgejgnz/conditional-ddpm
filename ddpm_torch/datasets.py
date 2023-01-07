@@ -50,18 +50,12 @@ class CelebA(datasets.VisionDataset):
         self.embs_tensor = torch.load(emb_tensor_filename)
         self.c_in_dim = self.embs_tensor.shape[1]
 
-        """
         self.labels = [(4,'Bald'),  #0
-            (8,'Black_Hair'),       #1
-            (9,'Blonde_Hair'),      #2
-            (11,'Brown_Hair'),      #3
-            (15,'Eyeglasses'),      #4
-            (17,'Gray_Hair'),       #5
-            (20,'Male')]            #6
-        """
+            (15,'Eyeglasses'),      #1
+            (20,'Male')]            #2
 
-        self.labels = [(15,'Eyeglasses')] #0
-
+        self.imgs_path = os.path.join(self.root, self.base_folder, "img_align_celeba")
+        self.listdir = sorted(os.listdir(self.imgs_path)) # sorted
         ###########################################
 
     def _load_csv(
@@ -85,15 +79,17 @@ class CelebA(datasets.VisionDataset):
         return CSV(headers, indices, torch.tensor(data_int))
 
     def __getitem__(self, index):
-        X = PIL.Image.open(os.path.join(
-            self.root, self.base_folder, "img_align_celeba", self.filename[index]))
+        X = PIL.Image.open(os.path.join(self.imgs_path, self.filename[index]))
 
         if self.transform is not None:
             X = self.transform(X)
 
         ###########################################
-        emb = self.embs_tensor[index]
-        emb = torch.gather(emb, 0, torch.tensor([l[0]for l in self.labels]))
+        file_idx = self.listdir.index(self.filename[index])
+
+        emb = self.embs_tensor[file_idx]
+        indices = torch.tensor([l[0]for l in self.labels])
+        emb = torch.index_select(emb, 0, indices)
         emb = emb.type(torch.float).to(X.device)
 
         emb = emb / 2.0 + 0.5 # [-1,1] -> [-0.5,0.5] -> [0,1]
